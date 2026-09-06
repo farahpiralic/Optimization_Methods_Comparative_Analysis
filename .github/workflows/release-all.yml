@@ -78,66 +78,59 @@ jobs:
           cmake --build %USERPROFILE%\natID.RAMDisk\build --config Release
           dir R:\Out\%SOLUTION%\Release
 
-      - name: Stage GTK dlls, satisfy every name the package lists
+      - name: Put GTK dlls where the collector expects and fix drifted names
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Continue"
-          $want = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
+          $ErrorActionPreference = "Stop"
 
-          # ---- 1) copy every GTK dll from anywhere under the SDK into $want ----
-          $srcRoots = @("$env:USERPROFILE\natID.SDK\bin\GTK", "$env:USERPROFILE\natID.SDK\bin")
-          $all = @()
-          foreach ($r in $srcRoots) {
-            if (Test-Path $r) { $all += Get-ChildItem $r -Recurse -Filter *.dll -ErrorAction SilentlyContinue }
-          }
+          # In this SDK the GTK dlls ship flat in bin\GTK\ , but the collector's
+          # GTK4.xml points at bin\GTK\release\bin\ . Mirror them there, then add
+          # the handful of files whose names drifted between GTK versions.
+          $srcGtk = "$env:USERPROFILE\natID.SDK\bin\GTK"
+          $want   = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
           New-Item -ItemType Directory -Force -Path $want | Out-Null
-          $seen = @{}
-          foreach ($f in $all) {
-            if ($f.DirectoryName -ieq $want) { continue }
-            if (-not $seen.ContainsKey($f.Name.ToLower())) {
-              $seen[$f.Name.ToLower()] = $true
-              Copy-Item $f.FullName -Destination (Join-Path $want $f.Name) -Force -ErrorAction SilentlyContinue
-            }
-          }
-          $have = Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
-          $haveSet = @{}; foreach ($h in $have) { $haveSet[$h.ToLower()] = $h }
-          Write-Host ("expected folder now holds {0} dlls" -f $have.Count)
 
-          # ---- 2) DUMP the real GTK4.xml so we can see how names are written ----
-          $pkgs = Get-ChildItem "$env:USERPROFILE\natID.SDK" -Recurse -Filter GTK4.xml -ErrorAction SilentlyContinue |
-                  Select-Object -ExpandProperty FullName
-          foreach ($pkg in $pkgs) {
-            Write-Host "==================== $pkg ===================="
-            Get-Content $pkg | ForEach-Object { Write-Host $_ }
-            Write-Host "=============================================="
+          if (-not (Test-Path $srcGtk)) { throw "GTK folder not found at $srcGtk" }
+
+          # 1) copy every dll found anywhere under bin\GTK into the expected folder
+          Get-ChildItem $srcGtk -Recurse -Filter *.dll -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName -Destination (Join-Path $want $_.Name) -Force
+          }
+          Write-Host ("copied {0} dlls into {1}" -f (Get-ChildItem $want -Filter *.dll).Count, $want)
+
+          # 2) provide the exact legacy names GTK4.xml still asks for, by copying
+          #    from the real (renamed) dll this SDK actually ships.
+          $map = @{
+            "ffi-7.dll"      = @("ffi-8.dll");
+            "jpeg-8.2.2.dll" = @("jpeg62.dll","turbojpeg.dll");
+            "pkgconf-4.dll"  = @("pkgconf-7.dll");
+            "png16-16.dll"   = @("libpng16.dll");
+            "tiff4.dll"      = @("tiff.dll");
+            "xml2-2.dll"     = @("xml2-16.dll");
+            "z.dll"          = @("zlib1.dll");
+          }
+          foreach ($legacy in $map.Keys) {
+            $dest = Join-Path $want $legacy
+            if (Test-Path $dest) { Write-Host "  $legacy already present"; continue }
+            $done = $false
+            foreach ($real in $map[$legacy]) {
+              $rp = Join-Path $want $real
+              if (Test-Path $rp) { Copy-Item $rp -Destination $dest -Force; Write-Host "  $legacy  <=  $real"; $done=$true; break }
+            }
+            if (-not $done) { Write-Host "  WARNING: no source found for $legacy (looked for: $($map[$legacy] -join ', '))" }
           }
 
-          # ---- 3) extract EVERY *.dll token from the package text, and make sure
-          #         each one exists on disk. If a listed dll is missing, create it
-          #         by copying the nearest real dll with the same alphabetic prefix
-          #         (satisfies the collector's file-exists check regardless of how
-          #         the XML is structured). ----
-          foreach ($pkg in $pkgs) {
-            $text = Get-Content $pkg -Raw
-            $names = [regex]::Matches($text, '[A-Za-z0-9._+-]+\.dll') | ForEach-Object { $_.Value } | Sort-Object -Unique
-            Write-Host ("package lists {0} distinct dll name(s)" -f $names.Count)
-            foreach ($n in $names) {
-              $dest = Join-Path $want $n
-              if (Test-Path $dest) { continue }
-              $base = ([regex]::Match($n, '^[A-Za-z]+')).Value
-              $cand = $have | Where-Object { $_ -like "$base*dll" } | Select-Object -First 1
-              if ($cand) {
-                Copy-Item (Join-Path $want $cand) -Destination $dest -Force
-                Write-Host ("  created missing {0}  (copy of {1})" -f $n, $cand)
-              } else {
-                # nothing similar exists; drop a tiny placeholder so the exists-check passes
-                Set-Content -Path $dest -Value ([byte[]](0)) -Encoding Byte
-                Write-Host ("  created placeholder {0}  (no similar dll to copy)" -f $n)
-              }
-            }
-          }
-          Write-Host ("final dll count in expected folder: {0}" -f (Get-ChildItem $want -Filter *.dll).Count)
-          Write-Host ("ffi-7.dll now present: {0}" -f (Test-Path (Join-Path $want 'ffi-7.dll')))
+          # 3) report: does every name GTK4.xml lists now resolve?
+          $need = @("adwaita-1-0","cairo-2","cairo-gobject-2","cairo-script-interpreter-2","epoxy-0",
+                    "ffi-7","freetype-6","fribidi-0","gdk_pixbuf-2.0-0","gio-2.0-0","glib-2.0-0",
+                    "gmodule-2.0-0","gobject-2.0-0","graphene-1.0-0","gthread-2.0-0","gtk-4-1",
+                    "harfbuzz-gobject","harfbuzz-subset","harfbuzz","intl-8","jpeg-8.2.2","pango-1.0-0",
+                    "pangocairo-1.0-0","pangowin32-1.0-0","pixman-1-0","pkgconf-4","png16-16","sass",
+                    "tiff4","xml2-2","z")
+          $missing = @()
+          foreach ($n in $need) { if (-not (Test-Path (Join-Path $want "$n.dll"))) { $missing += "$n.dll" } }
+          if ($missing.Count) { Write-Host ("STILL MISSING: {0}" -f ($missing -join ', ')) }
+          else { Write-Host "all GTK4.xml names resolve OK" }
 
       - name: Collect installer
         shell: pwsh
