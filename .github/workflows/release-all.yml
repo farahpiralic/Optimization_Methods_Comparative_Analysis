@@ -81,36 +81,60 @@ jobs:
       - name: Fix GTK4 DLL names to match this SDK (pitfall 5)
         shell: pwsh
         run: |
-          $gtkBin = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
-          $pkg    = "$env:USERPROFILE\natID.SDK\DevEnv\SetupCollectors\Packages\GTK4.xml"
-          if (-not (Test-Path $gtkBin)) { Write-Host "no GTK bin dir at $gtkBin - skipping"; exit 0 }
-          if (-not (Test-Path $pkg))    { Write-Host "no GTK4.xml at $pkg - skipping"; exit 0 }
-
-          $have = Get-ChildItem $gtkBin -Filter *.dll | Select-Object -ExpandProperty Name
-          $haveSet = @{}; foreach ($h in $have) { $haveSet[$h.ToLower()] = $h }
-          Write-Host ("SDK ships {0} GTK dlls" -f $have.Count)
-
-          $xml = Get-Content $pkg -Raw
-          # every *.dll filename mentioned in the package file
-          $names = [regex]::Matches($xml, '[A-Za-z0-9._+-]+\.dll') | ForEach-Object { $_.Value } | Sort-Object -Unique
-          $fixed = 0; $missing = @()
-          foreach ($n in $names) {
-            if ($haveSet.ContainsKey($n.ToLower())) { continue }   # already correct
-            # base prefix up to the version tail, e.g. "adwaita-1-" from "adwaita-1-0.dll"
-            $stem = [regex]::Replace($n, '(\d+([._-]\d+)*)?\.dll$', '')
-            $cand = $have | Where-Object { $_ -like "$stem*dll" } | Select-Object -First 1
-            if (-not $cand) { $cand = $have | Where-Object { $_ -like "$($stem.Split('-')[0])*dll" } | Select-Object -First 1 }
-            if ($cand -and $cand -ne $n) {
-              $xml = $xml -replace [regex]::Escape($n), $cand
-              Write-Host "  $n  ->  $cand"
-              $fixed++
-            } elseif (-not $cand) {
-              $missing += $n
+          $ErrorActionPreference = "Continue"
+          # 1) find the real GTK dlls, wherever they are under the SDK
+          $roots = @(
+            "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin",
+            "$env:USERPROFILE\natID.SDK\bin\GTK\release",
+            "$env:USERPROFILE\natID.SDK\bin\GTK",
+            "$env:USERPROFILE\natID.SDK\bin"
+          )
+          $have = @()
+          foreach ($r in $roots) {
+            if (Test-Path $r) {
+              $have += Get-ChildItem $r -Recurse -Filter *.dll -ErrorAction SilentlyContinue |
+                       Select-Object -ExpandProperty Name
             }
           }
-          Set-Content $pkg $xml -NoNewline
-          Write-Host ("patched {0} name(s)" -f $fixed)
-          if ($missing.Count) { Write-Host ("still missing (no match on disk): {0}" -f ($missing -join ', ')) }
+          $have = $have | Sort-Object -Unique
+          Write-Host ("Found {0} GTK dll files under the SDK" -f $have.Count)
+          $adw = $have | Where-Object { $_ -like "adwaita*" }
+          Write-Host ("adwaita dlls actually present: {0}" -f (($adw -join ', ')))
+          $haveSet = @{}; foreach ($h in $have) { $haveSet[$h.ToLower()] = $h }
+
+          # 2) patch EVERY GTK4.xml on the machine (SDK copy AND any staged copy)
+          $pkgs = Get-ChildItem "$env:USERPROFILE\natID.SDK" -Recurse -Filter GTK4.xml -ErrorAction SilentlyContinue |
+                  Select-Object -ExpandProperty FullName
+          Write-Host ("GTK4.xml files to patch: {0}" -f $pkgs.Count)
+          foreach ($p in $pkgs) { Write-Host "  $p" }
+
+          if ($have.Count -eq 0 -or $pkgs.Count -eq 0) {
+            Write-Host "nothing to do (missing dlls or missing GTK4.xml) - leaving as-is"
+            exit 0
+          }
+
+          foreach ($pkg in $pkgs) {
+            $xml = Get-Content $pkg -Raw
+            $names = [regex]::Matches($xml, '[A-Za-z0-9._+-]+\.dll') | ForEach-Object { $_.Value } | Sort-Object -Unique
+            $fixed = 0; $missing = @()
+            foreach ($n in $names) {
+              if ($haveSet.ContainsKey($n.ToLower())) { continue }
+              $stem = [regex]::Replace($n, '(\d+([._-]\d+)*)?\.dll$', '')
+              $cand = $have | Where-Object { $_ -like "$stem*dll" } | Select-Object -First 1
+              if (-not $cand) {
+                $base = ($stem -split '-')[0]
+                $cand = $have | Where-Object { $_ -like "$base*dll" } | Select-Object -First 1
+              }
+              if ($cand -and $cand -ne $n) {
+                $xml = $xml -replace [regex]::Escape($n), $cand
+                Write-Host ("  [{0}]  {1} -> {2}" -f (Split-Path $pkg -Leaf), $n, $cand)
+                $fixed++
+              } elseif (-not $cand) { $missing += $n }
+            }
+            Set-Content $pkg $xml -NoNewline
+            Write-Host ("patched {0}: {1} name(s) fixed" -f $pkg, $fixed)
+            if ($missing.Count) { Write-Host ("  still missing: {0}" -f ($missing -join ', ')) }
+          }
 
       - name: Collect installer
         shell: pwsh
