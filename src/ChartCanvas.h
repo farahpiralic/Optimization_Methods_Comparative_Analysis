@@ -1,5 +1,3 @@
-//  OptimCompare - Project #16 (F. Piralić, 20106)
-//
 //  ChartCanvas.h
 //  Multi-series line chart on a plain gui::Canvas with optional logarithmic
 //  axes. Two instances drive the proposal's plot panels:
@@ -10,8 +8,6 @@
 //      log-scale on both axes (SD appears as a straight line of slope ~1,
 //      Newton and BFGS as flat lines).
 //
-//  Only Canvas / Shape / DrawableString calls that the SDK examples
-//  themselves exercise are used.
 #pragma once
 
 #include <gui/Canvas.h>
@@ -21,6 +17,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 
 class ChartCanvas : public gui::Canvas
 {
@@ -40,10 +37,21 @@ private:
 
     static constexpr double kLogFloor = 1e-16;
 
+    // step-by-step reveal of the series (Canvas animation frames)
+    // pacing: per-step time and total-duration clamp (tune to taste)
+    static constexpr double kRevealMsPerStep = 240.0;
+    static constexpr double kRevealMinMs     = 1500.0;
+    static constexpr double kRevealMaxMs     = 8000.0;
+    bool _revealing = false;
+    bool _stopPending = false; // see ContourCanvas: never stop mid-draw
+    std::chrono::steady_clock::time_point _revealT0;
+    std::vector<double> _revealDurMs; // one duration per series
+
 public:
     ChartCanvas() : gui::Canvas({})
     {
         enableResizeEvent(true);
+        setPreferredFrameRateRange(30, 60); // used by the step-reveal animation
     }
 
     void setLabels(const td::String& title, const td::String& xName,
@@ -55,7 +63,42 @@ public:
     void setLogX(bool b) { _logX = b; }
     void setLogY(bool b) { _logY = b; }
 
-    void clearSeries() { _series.clear(); reDraw(); }
+    void clearSeries()
+    {
+        _series.clear();
+        cancelReveal();
+        reDraw();
+    }
+
+    //  Step-by-step reveal, same per-series duration rule as the contour
+    //  canvas so both panels stay visually in sync.
+    void beginReveal()
+    {
+        if (_series.empty())
+            return;
+        _revealDurMs.clear();
+        for (const Series& s : _series)
+        {
+            const double n = (double)std::min(s.x.size(), s.y.size());
+            _revealDurMs.push_back(std::min(kRevealMaxMs,
+                std::max(kRevealMinMs, n * kRevealMsPerStep)));
+        }
+        _revealT0 = std::chrono::steady_clock::now();
+        _revealing = true;
+        _stopPending = false;
+        startAnimation();
+        reDraw();
+    }
+
+    void cancelReveal()
+    {
+        _stopPending = false;
+        if (_revealing)
+        {
+            _revealing = false;
+            stopAnimation();
+        }
+    }
 
     void addSeries(const std::vector<double>& x, const std::vector<double>& y,
                    td::ColorID color, const td::String& name)
@@ -85,6 +128,13 @@ protected:
 
     void onDraw(const gui::Rect& /*rect*/) override
     {
+        if (_stopPending && !_revealing)
+        {
+            _stopPending = false;
+            stopAnimation();
+            reDraw();
+        }
+
         const double L = 62, R = 14, T = 26, B = 40;
         const double w = (double)_size.width, h = (double)_size.height;
         const double plotW = std::max(10.0, w - L - R);
@@ -99,7 +149,7 @@ protected:
         frame.createPolygon(fr, 4, 1.0f);
         frame.drawWire(td::ColorID::Gray);
 
-        // ---- data ranges (in transformed coordinates) -----------------------
+        //data ranges (in transformed coordinates) 
         bool any = false;
         double xMin = 0, xMax = 1, yMin = 0, yMax = 1;
         for (const Series& s : _series)
@@ -128,7 +178,7 @@ protected:
 
         td::String lbl;
 
-        // ---- ticks + grid ----------------------------------------------------
+        //ticks + grid
         if (_logX)
         {
             for (int e = (int)std::ceil(xMin); e <= (int)std::floor(xMax); ++e)
@@ -188,24 +238,49 @@ protected:
         gui::DrawableString::draw(_yName, gui::Point(6, T - 16),
                                   gui::Font::ID::SystemSmaller, td::ColorID::SysText);
 
-        // ---- series ----------------------------------------------------------
-        for (const Series& s : _series)
+        // ---- series (revealed progressively while the animation runs) -------
+        double elapsedMs = 0.0;
+        if (_revealing)
         {
+            elapsedMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - _revealT0).count();
+            bool allDone = true;
+            for (double d : _revealDurMs)
+                if (elapsedMs < d) { allDone = false; break; }
+            if (allDone)
+            {
+                _revealing = false;
+                _stopPending = true; // stop on the next frame, not mid-draw
+            }
+        }
+
+        for (size_t si = 0; si < _series.size(); ++si)
+        {
+            const Series& s = _series[si];
             const size_t nPts = std::min(s.x.size(), s.y.size());
             if (nPts == 0) continue;
 
+            size_t nVis = nPts;
+            bool done = true;
+            if (_revealing && si < _revealDurMs.size())
+            {
+                const double frac = std::min(1.0, elapsedMs / _revealDurMs[si]);
+                nVis = 1 + (size_t)(frac * (double)(nPts - 1));
+                done = (frac >= 1.0);
+            }
+
             std::vector<gui::Point> pts;
-            pts.reserve(nPts);
-            for (size_t i = 0; i < nPts; ++i)
+            pts.reserve(nVis);
+            for (size_t i = 0; i < nVis; ++i)
                 pts.push_back({PX(s.x[i]), PY(s.y[i])});
 
-            if (nPts > 1)
+            if (pts.size() > 1)
             {
                 gui::Shape line;
                 line.createPolyLine(pts.data(), pts.size(), 2.2f);
                 line.drawWire(s.color);
             }
-            if (nPts <= 80) // markers only when readable
+            if (nPts <= 80) // markers only when readable (full-size decision)
             {
                 for (const gui::Point& p : pts)
                 {
@@ -213,6 +288,13 @@ protected:
                     dot.createCircle(gui::Circle(p, 2.6), 1.0f);
                     dot.drawFill(s.color);
                 }
+            }
+            if (!done)
+            {
+                // the "pen tip": current end of this curve
+                gui::Shape cur;
+                cur.createCircle(gui::Circle(pts.back(), 3.4), 1.0f);
+                cur.drawFill(s.color);
             }
         }
 

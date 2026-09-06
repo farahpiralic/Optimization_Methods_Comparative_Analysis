@@ -29,6 +29,7 @@
 #include <functional>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 class ContourCanvas : public gui::Canvas
 {
@@ -45,7 +46,8 @@ private:
     double _cx = 0.0, _cy = 0.0;
     double _scale = 100.0;
     gui::Size _size {760, 460};
-    bool _needFit = false; // canvas size unknown before first onResize
+    bool _haveSize = false; // becomes true on the first real onResize
+    bool _needFit = false;  // re-fit once the real canvas size is known
 
     // panning
     bool _panning = false;
@@ -60,6 +62,19 @@ private:
     double _ccx = 1e300, _ccy = 1e300, _cscale = -1.0, _cw = -1.0, _ch = -1.0;
     const opt::IObjective* _cfn = nullptr;
 
+    // step-by-step reveal of the trajectories (Canvas animation frames)
+    // pacing: per-step time and total-duration clamp (tune to taste)
+    static constexpr double kRevealMsPerStep = 240.0;
+    static constexpr double kRevealMinMs     = 1500.0;
+    static constexpr double kRevealMaxMs     = 8000.0;
+    bool _revealing = false;
+    bool _stopPending = false; // stop the animation on the NEXT frame, not
+                               // mid-draw (mid-draw stops can leave some
+                               // backends with a stale pending-frame flag
+                               // that swallows later reDraw() calls)
+    std::chrono::steady_clock::time_point _revealT0;
+    std::vector<double> _revealDurMs; // one duration per run
+
 public:
     ContourCanvas()
     : gui::Canvas({gui::InputDevice::Event::PrimaryClicks,
@@ -68,18 +83,77 @@ public:
                    gui::InputDevice::Event::Zoom})
     {
         enableResizeEvent(true);
+        setPreferredFrameRateRange(30, 60); // used by the step-reveal animation
     }
 
     void setFunction(const opt::IObjective* fn)
     {
         _fn = fn;
         fitToFunction();
+        _needFit = !_haveSize; // placeholder size used: re-fit on first resize
+    }
+
+    //  Full clear: back to the untouched startup look - no function, no
+    //  contours, no start marker, nothing.
+    void clearAll()
+    {
+        cancelReveal();
+        _fn = nullptr;
+        _hasStart = false;
+        _cfn = nullptr; // invalidate the contour cache
+        reDraw();
     }
 
     void setRuns(const std::vector<opt::RunResult>* runs)
     {
         _runs = runs;
+        cancelReveal(); // new data: show it fully unless beginReveal() follows
         reDraw();
+    }
+
+    //  Step-by-step animation: reveals every trajectory point by point.
+    //  Short runs (Newton) get ~120 ms per step so each step is visible;
+    //  long runs are compressed so nothing takes more than 6 seconds -
+    //  which also makes Newton visibly FINISH first, then BFGS, while
+    //  steepest descent is still zigzagging.
+    void beginReveal()
+    {
+        if (!_runs || _runs->empty())
+            return;
+        _revealDurMs.clear();
+        for (const opt::RunResult& r : *_runs)
+        {
+            const double n = (double)r.trace.size();
+            _revealDurMs.push_back(std::min(kRevealMaxMs,
+                std::max(kRevealMinMs, n * kRevealMsPerStep)));
+        }
+        _revealT0 = std::chrono::steady_clock::now();
+        _revealing = true;
+        _stopPending = false;
+        startAnimation(); // onDraw now runs at the preferred frame rate
+        reDraw();
+    }
+
+    void cancelReveal()
+    {
+        _stopPending = false;
+        if (_revealing)
+        {
+            _revealing = false;
+            stopAnimation();
+        }
+    }
+
+    //  shared trajectory colors (MainView uses this for the chart series too)
+    static td::ColorID methodColor(opt::Method m)
+    {
+        switch (m)
+        {
+            case opt::Method::SteepestDescent: return td::ColorID::Crimson;
+            case opt::Method::Newton:          return td::ColorID::DarkOrange;
+            case opt::Method::BFGS:            return td::ColorID::DarkMagenta;
+        }
+        return td::ColorID::SysText;
     }
 
     void setStart(double x, double y)
@@ -100,7 +174,14 @@ public:
         const double h = std::max(1e-9, y1 - y0);
         _scale = 0.92 * std::min((double)_size.width / w,
                                  (double)_size.height / h);
-        _needFit = false;
+        // self-heal: if a finished reveal left the animation machinery in an
+        // inconsistent state, clear it so this reDraw() cannot be swallowed
+        if (!_revealing && isAnimating())
+        {
+            _stopPending = false;
+            stopAnimation();
+        }
+        _cfn = nullptr; // force a contour recompute for the new framing
         reDraw();
     }
 
@@ -114,8 +195,12 @@ protected:
     void onResize(const gui::Size& newSize) override
     {
         _size = newSize;
+        _haveSize = true;
         if (_needFit && _fn)
+        {
+            _needFit = false;
             fitToFunction(); // now that the real size is known
+        }
     }
 
     void onPrimaryButtonPressed(const gui::InputDevice& dev) override
@@ -284,29 +369,28 @@ protected:
         return ramp[idx];
     }
 
-    static td::ColorID methodColor(opt::Method m)
-    {
-        switch (m)
-        {
-            case opt::Method::SteepestDescent: return td::ColorID::Crimson;
-            case opt::Method::Newton:          return td::ColorID::DarkOrange;
-            case opt::Method::BFGS:            return td::ColorID::DarkMagenta;
-        }
-        return td::ColorID::SysText;
-    }
-
     // ---- drawing --------------------------------------------------------------
     void onDraw(const gui::Rect& /*rect*/) override
     {
+        if (_stopPending && !_revealing)
+        {
+            // deferred stop: the reveal finished on a previous frame;
+            // end the animation at the START of a fresh frame and push one
+            // clean invalidation through the now-stopped state
+            _stopPending = false;
+            stopAnimation();
+            reDraw();
+        }
+
         const double W = (double)_size.width, H = (double)_size.height;
 
         ensureContours();
 
-        // axes through the origin (if visible)
-        if (px(0.0) >= 0 && px(0.0) <= W)
+        // axes through the origin (only when a function is displayed)
+        if (_fn && px(0.0) >= 0 && px(0.0) <= W)
             gui::Shape::drawLine({px(0.0), 0.0}, {px(0.0), H},
                                  td::ColorID::LightGray, 1.0f, td::LinePattern::Dash);
-        if (py(0.0) >= 0 && py(0.0) <= H)
+        if (_fn && py(0.0) >= 0 && py(0.0) <= H)
             gui::Shape::drawLine({0.0, py(0.0)}, {W, py(0.0)},
                                  td::ColorID::LightGray, 1.0f, td::LinePattern::Dash);
 
@@ -340,20 +424,46 @@ protected:
             }
         }
 
-        // trajectories
+        // trajectories (revealed progressively while the animation runs)
         if (_runs)
         {
-            for (const opt::RunResult& r : *_runs)
+            double elapsedMs = 0.0;
+            if (_revealing)
             {
+                elapsedMs = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - _revealT0).count();
+                bool allDone = true;
+                for (double d : _revealDurMs)
+                    if (elapsedMs < d) { allDone = false; break; }
+                if (allDone)
+                {
+                    _revealing = false;
+                    _stopPending = true; // stop on the next frame, not mid-draw
+                }
+            }
+
+            for (size_t ri = 0; ri < _runs->size(); ++ri)
+            {
+                const opt::RunResult& r = (*_runs)[ri];
                 const auto& tr_ = r.trace;
                 if (tr_.empty())
                     continue;
                 const td::ColorID col = methodColor(r.method);
 
+                size_t nVis = tr_.size();
+                bool done = true;
+                if (_revealing && ri < _revealDurMs.size())
+                {
+                    const double frac =
+                        std::min(1.0, elapsedMs / _revealDurMs[ri]);
+                    nVis = 1 + (size_t)(frac * (double)(tr_.size() - 1));
+                    done = (frac >= 1.0);
+                }
+
                 std::vector<gui::Point> pts;
-                pts.reserve(tr_.size());
-                for (const opt::Iterate& it : tr_)
-                    pts.push_back({px(it.x0), py(it.x1)});
+                pts.reserve(nVis);
+                for (size_t k = 0; k < nVis; ++k)
+                    pts.push_back({px(tr_[k].x0), py(tr_[k].x1)});
 
                 if (pts.size() > 1)
                 {
@@ -361,7 +471,7 @@ protected:
                     line.createPolyLine(pts.data(), pts.size(), 2.4f);
                     line.drawWire(col);
                 }
-                if (pts.size() <= 80)
+                if (tr_.size() <= 80) // decision on the full trace: stable look
                 {
                     for (const gui::Point& p : pts)
                     {
@@ -370,10 +480,20 @@ protected:
                         dot.drawFill(col);
                     }
                 }
-                // ring on the final iterate
-                gui::Shape ring;
-                ring.createCircle(gui::Circle(pts.back(), 5.0), 2.0f);
-                ring.drawWire(col);
+                if (done)
+                {
+                    // ring on the final iterate
+                    gui::Shape ring;
+                    ring.createCircle(gui::Circle(pts.back(), 5.0), 2.0f);
+                    ring.drawWire(col);
+                }
+                else
+                {
+                    // the "moving point": this method's current iterate
+                    gui::Shape cur;
+                    cur.createCircle(gui::Circle(pts.back(), 4.0), 1.2f);
+                    cur.drawFill(col);
+                }
             }
         }
 
@@ -418,9 +538,5 @@ protected:
             }
         }
 
-        // interaction hint (bottom-left)
-        gui::DrawableString::draw(tr("contourHint"),
-                                  gui::Point(10, H - 22),
-                                  gui::Font::ID::SystemSmaller, td::ColorID::Gray);
     }
 };

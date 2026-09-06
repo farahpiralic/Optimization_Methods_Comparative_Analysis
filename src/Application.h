@@ -1,4 +1,3 @@
-//  OptimCompare - Project #16 (F. Piralić, 20106)
 //  Application.h
 #pragma once
 #include <gui/Application.h>

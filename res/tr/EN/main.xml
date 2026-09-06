@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <DevRes>
     <Translations>
-        <Res id="appTitle" tr="OptimCompare - First- vs Second-Order Methods (F. Piralić, 20106)"/>
+        <Res id="appTitle" tr="OptimCompare - Comparative analysis"/>
         <Res id="App" tr="App"/>
         <Res id="menuRun" tr="Run"/>
         <Res id="menuHelp" tr="Help"/>
@@ -11,11 +11,10 @@
         <Res id="run" tr="Run"/>
         <Res id="runTT" tr="Run the selected method(s) from x0"/>
         <Res id="runStudy" tr="Kappa study"/>
-        <Res id="runStudyTT" tr="Run all methods on quadratics with increasing condition number"/>
-        <Res id="resetView" tr="Reset view"/>
+        <Res id="resetView" tr="Reset"/>
         <Res id="about" tr="About"/>
         <Res id="aboutTitle" tr="About OptimCompare"/>
-        <Res id="aboutText" tr="Comparative analysis of first- and second-order unconstrained optimization methods: steepest descent, Newton and BFGS, each with exact line search and Armijo backtracking, on strongly convex, ill-conditioned and non-convex benchmark functions. Project #16, F. Piralić (index 20106)."/>
+        <Res id="aboutText" tr="Comparative analysis of first- and second-order unconstrained optimization methods: steepest descent, Newton and BFGS, each with exact line search and Armijo backtracking, on strongly convex, ill-conditioned and non-convex benchmark functions."/>
 
         <Res id="lblFunction" tr="Function:"/>
         <Res id="lblMethod" tr="Method:"/>
@@ -26,7 +25,7 @@
         <Res id="lblEps" tr="Tolerance (eps):"/>
         <Res id="btnRun" tr="Run"/>
         <Res id="btnStudy" tr="Run kappa study"/>
-        <Res id="btnReset" tr="Reset view"/>
+        <Res id="btnReset" tr="Reset"/>
 
         <Res id="methodSD" tr="Steepest descent"/>
         <Res id="methodNewton" tr="Newton"/>
@@ -35,14 +34,14 @@
         <Res id="stratExact" tr="Exact line search"/>
         <Res id="stratArmijo" tr="Armijo backtracking"/>
 
-        <Res id="convTitle" tr="Convergence: ||grad f|| per iteration (log scale)"/>
+        <Res id="convTitle" tr="Convergence: ||grad f|| (log y)"/>
         <Res id="axIter" tr="iteration"/>
         <Res id="axGNorm" tr="||grad f||"/>
         <Res id="condTitle" tr="Iterations vs condition number kappa"/>
         <Res id="axKappa" tr="kappa"/>
         <Res id="axIters" tr="iterations"/>
+        <Res id="chbAnimate" tr="Animate steps"/>
         <Res id="chartNoData" tr="no data yet - press Run"/>
-        <Res id="contourHint" tr="drag: pan | scroll: zoom | right-click: set x0 and run"/>
 
         <Res id="dlgSettings" tr="Settings"/>
         <Res id="lblLang" tr="Current language:"/>

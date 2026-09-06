@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <DevRes>
     <Translations>
-        <Res id="appTitle" tr="OptimCompare - Poređenje metoda prvog i drugog reda (F. Piralić, 20106)"/>
+        <Res id="appTitle" tr="OptimCompare - Poređenje metoda"/>
         <Res id="App" tr="App"/>
         <Res id="menuRun" tr="Pokretanje"/>
         <Res id="menuHelp" tr="Pomoć"/>
@@ -11,11 +11,10 @@
         <Res id="run" tr="Pokreni"/>
         <Res id="runTT" tr="Pokreni odabranu metodu(e) iz x0"/>
         <Res id="runStudy" tr="Studija uslovljenosti"/>
-        <Res id="runStudyTT" tr="Pokreni sve metode na kvadratnim funkcijama rastuće uslovljenosti"/>
-        <Res id="resetView" tr="Resetuj prikaz"/>
+        <Res id="resetView" tr="Resetuj"/>
         <Res id="about" tr="O aplikaciji"/>
         <Res id="aboutTitle" tr="O aplikaciji OptimCompare"/>
-        <Res id="aboutText" tr="Uporedna analiza metoda prvog i drugog reda za neograničenu optimizaciju: najbrži pad, Newtonova metoda i BFGS, svaka sa egzaktnom linijskom pretragom i Armijo backtracking strategijom, na jako konveksnim, loše uslovljenim i nekonveksnim test funkcijama. Projekat #16, F. Piralić (indeks 20106)."/>
+        <Res id="aboutText" tr="Uporedna analiza metoda prvog i drugog reda: Gradient descent, Newtonova metoda i BFGS, svaka sa egzaktnom linijskom pretragom i Armijo backtracking strategijom, na konveksnim i nekonveksnim test funkcijama."/>
 
         <Res id="lblFunction" tr="Funkcija:"/>
         <Res id="lblMethod" tr="Metoda:"/>
@@ -25,8 +24,8 @@
         <Res id="lblMaxIter" tr="Maks. iteracija:"/>
         <Res id="lblEps" tr="Tolerancija (eps):"/>
         <Res id="btnRun" tr="Pokreni"/>
-        <Res id="btnStudy" tr="Studija uslovljenosti"/>
-        <Res id="btnReset" tr="Resetuj prikaz"/>
+        <Res id="btnStudy" tr="Studija uslovljenosti kappa"/>
+        <Res id="btnReset" tr="Resetuj"/>
 
         <Res id="methodSD" tr="Najbrži pad"/>
         <Res id="methodNewton" tr="Newtonova metoda"/>
@@ -35,14 +34,14 @@
         <Res id="stratExact" tr="Egzaktna linijska pretraga"/>
         <Res id="stratArmijo" tr="Armijo backtracking"/>
 
-        <Res id="convTitle" tr="Konvergencija: ||grad f|| po iteraciji (log skala)"/>
+        <Res id="convTitle" tr="Konvergencija ||grad f|| (log y)"/>
         <Res id="axIter" tr="iteracija"/>
         <Res id="axGNorm" tr="||grad f||"/>
         <Res id="condTitle" tr="Iteracije u zavisnosti od broja uslovljenosti kappa"/>
         <Res id="axKappa" tr="kappa"/>
         <Res id="axIters" tr="iteracije"/>
+        <Res id="chbAnimate" tr="Animiraj korake"/>
         <Res id="chartNoData" tr="još nema podataka - pritisnite Pokreni"/>
-        <Res id="contourHint" tr="prevlačenje: pomjeranje | scroll: zum | desni klik: postavi x0 i pokreni"/>
 
         <Res id="dlgSettings" tr="Postavke"/>
         <Res id="lblLang" tr="Trenutni jezik:"/>

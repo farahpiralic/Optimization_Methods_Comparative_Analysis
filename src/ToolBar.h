@@ -12,12 +12,13 @@ class ToolBar : public gui::ToolBar
 
 public:
     ToolBar()
-    : gui::ToolBar("mainTB", 3)
+    : gui::ToolBar("mainTB", 2)
     , _imgSettings(":settings")
     , _imgRun(":start")
     {
         addItem(tr("settings"), &_imgSettings, tr("settingsTT"), cMenuApp, 0, 0, 10);
         addItem(tr("run"), &_imgRun, tr("runTT"), cMenuRun, 0, 0, cActionRun);
-        addItem(tr("runStudy"), &_imgRun, tr("runStudyTT"), cMenuRun, 0, 0, cActionStudy);
+        // (no toolbar item for the kappa study - the panel button and the
+        //  Run menu entry cover it)
     }
 };

@@ -32,8 +32,8 @@ env:
   SOLUTION: optCompareSol            # SOLUTION_NAME from CMakeLists.txt
   PROJECT_REL: OptimCompare          # path under $HOME the config dev= expects
   CONFIG_DIR: installer               # folder in your repo holding <APP_NAME>.xml
-  SDK_TAG: v4.2.1                     # !! CONFIRM at github.com/idzafic/natID/releases
-  SDK_DATE: 20260710                  # !! CONFIRM: date stamp in the .7z asset names
+  SDK_TAG: v4.2.1                     # confirmed from natID releases page
+  SDK_DATE: 20260710                  # confirmed: date in the .7z asset names
 # ===========================================================================
 
 jobs:
