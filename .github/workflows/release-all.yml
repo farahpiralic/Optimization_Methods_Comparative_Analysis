@@ -78,7 +78,7 @@ jobs:
           cmake --build %USERPROFILE%\natID.RAMDisk\build --config Release
           dir R:\Out\%SOLUTION%\Release
 
-      - name: Ensure GTK dlls sit where the collector expects them
+      - name: Stage GTK dlls and reconcile GTK4.xml with reality
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
@@ -86,35 +86,53 @@ jobs:
           $want = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
           Write-Host "collector expects GTK dlls in: $want"
 
-          # Gather EVERY dll that lives anywhere under the GTK tree (all subfolders).
-          $gtkRoot = "$env:USERPROFILE\natID.SDK\bin\GTK"
-          $srcRoots = @($gtkRoot, "$env:USERPROFILE\natID.SDK\bin")
+          # ---- 1) copy every GTK dll from anywhere under the SDK into $want ----
+          $srcRoots = @("$env:USERPROFILE\natID.SDK\bin\GTK", "$env:USERPROFILE\natID.SDK\bin")
           $all = @()
           foreach ($r in $srcRoots) {
-            if (Test-Path $r) {
-              $all += Get-ChildItem $r -Recurse -Filter *.dll -ErrorAction SilentlyContinue
-            }
+            if (Test-Path $r) { $all += Get-ChildItem $r -Recurse -Filter *.dll -ErrorAction SilentlyContinue }
           }
-          # de-duplicate by file NAME (first occurrence wins), skip anything already in $want
           $seen = @{}; $src = @()
           foreach ($f in $all) {
             if ($f.DirectoryName -ieq $want) { continue }
             if (-not $seen.ContainsKey($f.Name.ToLower())) { $seen[$f.Name.ToLower()] = $true; $src += $f }
           }
-          Write-Host ("distinct GTK dll files discovered (outside target): {0}" -f $src.Count)
-
           New-Item -ItemType Directory -Force -Path $want | Out-Null
-          $copied = 0
-          foreach ($f in $src) {
-            Copy-Item $f.FullName -Destination (Join-Path $want $f.Name) -Force -ErrorAction SilentlyContinue
-            if ($?) { $copied++ }
-          }
-          $now = (Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue).Count
-          Write-Host ("copied {0} dlls; expected folder now holds {1} dlls total" -f $copied, $now)
+          foreach ($f in $src) { Copy-Item $f.FullName -Destination (Join-Path $want $f.Name) -Force -ErrorAction SilentlyContinue }
 
-          # sanity: report the two that bit us
-          foreach ($name in @("adwaita-1-0.dll","ffi-7.dll")) {
-            Write-Host ("  {0}: {1}" -f $name, (Test-Path (Join-Path $want $name)))
+          # what dll names actually exist now (in the expected folder)
+          $have = Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+          $haveSet = @{}; foreach ($h in $have) { $haveSet[$h.ToLower()] = $h }
+          Write-Host ("expected folder now holds {0} dlls" -f $have.Count)
+
+          # ---- 2) edit EVERY GTK4.xml: rename to a real file, else DROP the line ----
+          $pkgs = Get-ChildItem "$env:USERPROFILE\natID.SDK" -Recurse -Filter GTK4.xml -ErrorAction SilentlyContinue |
+                  Select-Object -ExpandProperty FullName
+          Write-Host ("GTK4.xml copies to reconcile: {0}" -f $pkgs.Count)
+
+          foreach ($pkg in $pkgs) {
+            $lines = Get-Content $pkg
+            $out = New-Object System.Collections.Generic.List[string]
+            $renamed = 0; $dropped = 0; $kept = 0
+            foreach ($line in $lines) {
+              $m = [regex]::Match($line, '([A-Za-z0-9._+-]+\.dll)')
+              if (-not $m.Success) { $out.Add($line); continue }
+              $n = $m.Value
+              if ($haveSet.ContainsKey($n.ToLower())) { $out.Add($line); $kept++; continue }  # exists -> keep
+              # try to rename to a real file sharing the same alphabetic prefix
+              $base = ([regex]::Match($n, '^[A-Za-z]+')).Value
+              $cand = $have | Where-Object { $_ -like "$base*dll" } | Select-Object -First 1
+              if ($cand) {
+                $out.Add(($line -replace [regex]::Escape($n), $cand))
+                Write-Host ("  [{0}] rename {1} -> {2}" -f (Split-Path $pkg -Leaf), $n, $cand)
+                $renamed++
+              } else {
+                Write-Host ("  [{0}] DROP {1} (no such dll in SDK)" -f (Split-Path $pkg -Leaf), $n)
+                $dropped++   # omit the line entirely
+              }
+            }
+            Set-Content $pkg $out -Encoding UTF8
+            Write-Host ("  {0}: kept {1}, renamed {2}, dropped {3}" -f (Split-Path $pkg -Leaf), $kept, $renamed, $dropped)
           }
 
       - name: Collect installer
