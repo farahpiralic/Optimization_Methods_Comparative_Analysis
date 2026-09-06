@@ -93,7 +93,9 @@ jobs:
           if (-not (Test-Path $srcGtk)) { throw "GTK folder not found at $srcGtk" }
 
           # 1) copy every dll found anywhere under bin\GTK into the expected folder
+          #    (skip files already sitting in the destination, so we never copy onto self)
           Get-ChildItem $srcGtk -Recurse -Filter *.dll -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_.DirectoryName -ieq $want) { return }
             Copy-Item $_.FullName -Destination (Join-Path $want $_.Name) -Force
           }
           Write-Host ("copied {0} dlls into {1}" -f (Get-ChildItem $want -Filter *.dll).Count, $want)
