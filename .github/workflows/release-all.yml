@@ -78,6 +78,40 @@ jobs:
           cmake --build %USERPROFILE%\natID.RAMDisk\build --config Release
           dir R:\Out\%SOLUTION%\Release
 
+      - name: Fix GTK4 DLL names to match this SDK (pitfall 5)
+        shell: pwsh
+        run: |
+          $gtkBin = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
+          $pkg    = "$env:USERPROFILE\natID.SDK\DevEnv\SetupCollectors\Packages\GTK4.xml"
+          if (-not (Test-Path $gtkBin)) { Write-Host "no GTK bin dir at $gtkBin - skipping"; exit 0 }
+          if (-not (Test-Path $pkg))    { Write-Host "no GTK4.xml at $pkg - skipping"; exit 0 }
+
+          $have = Get-ChildItem $gtkBin -Filter *.dll | Select-Object -ExpandProperty Name
+          $haveSet = @{}; foreach ($h in $have) { $haveSet[$h.ToLower()] = $h }
+          Write-Host ("SDK ships {0} GTK dlls" -f $have.Count)
+
+          $xml = Get-Content $pkg -Raw
+          # every *.dll filename mentioned in the package file
+          $names = [regex]::Matches($xml, '[A-Za-z0-9._+-]+\.dll') | ForEach-Object { $_.Value } | Sort-Object -Unique
+          $fixed = 0; $missing = @()
+          foreach ($n in $names) {
+            if ($haveSet.ContainsKey($n.ToLower())) { continue }   # already correct
+            # base prefix up to the version tail, e.g. "adwaita-1-" from "adwaita-1-0.dll"
+            $stem = [regex]::Replace($n, '(\d+([._-]\d+)*)?\.dll$', '')
+            $cand = $have | Where-Object { $_ -like "$stem*dll" } | Select-Object -First 1
+            if (-not $cand) { $cand = $have | Where-Object { $_ -like "$($stem.Split('-')[0])*dll" } | Select-Object -First 1 }
+            if ($cand -and $cand -ne $n) {
+              $xml = $xml -replace [regex]::Escape($n), $cand
+              Write-Host "  $n  ->  $cand"
+              $fixed++
+            } elseif (-not $cand) {
+              $missing += $n
+            }
+          }
+          Set-Content $pkg $xml -NoNewline
+          Write-Host ("patched {0} name(s)" -f $fixed)
+          if ($missing.Count) { Write-Host ("still missing (no match on disk): {0}" -f ($missing -join ', ')) }
+
       - name: Collect installer
         shell: pwsh
         run: |
