@@ -1,3 +1,4 @@
+//  OptimCompare - Project #16 (F. Piralić, 20106)
 //  MainWindow.h
 #pragma once
 #include <gui/Window.h>
@@ -20,7 +21,7 @@ protected:
     {
         _mainView.initialRun(); // populate all three panels on startup
     }
-    
+
     bool onActionItem(gui::ActionItemDescriptor& aiDesc) override
     {
         auto [menuID, firstSubMenuID, lastSubMenuID, actionID] = aiDesc.getIDs();
@@ -77,7 +78,7 @@ protected:
 
 public:
     MainWindow()
-    : gui::Window(gui::Geometry(40, 30, 1240, 850))
+    : gui::Window(gui::Geometry(40, 40, 1240, 800))
     {
         setTitle(tr("appTitle"));
         _mainMenuBar.setAsMain(this);

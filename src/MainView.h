@@ -1,3 +1,5 @@
+//  OptimCompare - Project #16 (F. Piralić, 20106)
+//
 //  MainView.h
 //  Assembles the GUI exactly as section 4 of the proposal describes:
 //  a control panel on the left, and on the right THREE plot panels shown
@@ -48,6 +50,17 @@ private:
     gui::SplitterLayout _splitMain   {gui::SplitterLayout::Orientation::Horizontal,
                                       gui::SplitterLayout::AuxiliaryCell::First};
 
+    static td::ColorID methodColor(opt::Method m)
+    {
+        switch (m)
+        {
+            case opt::Method::SteepestDescent: return td::ColorID::Crimson;
+            case opt::Method::Newton:          return td::ColorID::DarkOrange;
+            case opt::Method::BFGS:            return td::ColorID::DarkMagenta;
+        }
+        return td::ColorID::SysText;
+    }
+
 public:
     MainView()
     : _suite(opt::makeBenchmarkSuite())
@@ -61,17 +74,6 @@ public:
         _chartCond.setLogY(true);
 
         // --- layout: nested splitters -------------------------------------
-        // Without explicit minimums the splitter measures the bare canvases
-        // as ~0 and collapses the chart row on startup (canvases have no
-        // intrinsic size). UseAsMin also stops the user from dragging the
-        // charts completely away.
-        _chartConv.setSizeLimits(320, gui::Control::Limit::UseAsMin,
-                                 300, gui::Control::Limit::UseAsMin);
-        _chartCond.setSizeLimits(380, gui::Control::Limit::UseAsMin,
-                                 300, gui::Control::Limit::UseAsMin);
-        _bottomHost.setSizeLimits(0, gui::Control::Limit::None,
-                                  330, gui::Control::Limit::UseAsMin);
-
         _splitBottom.setContent(_chartConv, _chartCond);
         _bottomHost.setLayout(&_splitBottom);
 
@@ -84,7 +86,7 @@ public:
         // --- wiring ---------------------------------------------------------
         _controls.onRun             = [this]() { run(); };
         _controls.onStudy           = [this]() { runStudy(); };
-        _controls.onResetView       = [this]() { resetView(); };
+        _controls.onResetView       = [this]() { _contour.fitToFunction(); };
         _controls.onFunctionChanged = [this]() { selectFunction(); };
 
         _contour.onPickStart = [this](double x, double y)
@@ -117,21 +119,7 @@ public:
         run(); // immediately show the comparison on the new function
     }
 
-    //  Reset = clean slate, exactly like before anything ran: empty contour
-    //  panel (no function drawn), empty charts, empty log. Pressing Run (or
-    //  picking a function / right-clicking the canvas) starts fresh - and
-    //  re-frames the view, so this is also the recovery after a wild
-    //  pan/zoom.
-    void resetView()
-    {
-        _runs.clear();
-        _contour.setRuns(&_runs);
-        _contour.clearAll();
-        _chartConv.clearSeries();
-        _chartCond.clearSeries();
-        _controls.clearLog();
-        _lastFn = nullptr; // next run re-attaches the function and re-fits
-    }
+    void resetView() { _contour.fitToFunction(); }
 
     void run()
     {
@@ -178,15 +166,8 @@ public:
                 xs.push_back((double)k);
                 ys.push_back(r.trace[k].gNorm);
             }
-            _chartConv.addSeries(xs, ys, ContourCanvas::methodColor(r.method),
+            _chartConv.addSeries(xs, ys, methodColor(r.method),
                                  opt::toString(r.method));
-        }
-
-        // step-by-step animation of the trajectories and convergence curves
-        if (_controls.animate())
-        {
-            _contour.beginReveal();
-            _chartConv.beginReveal();
         }
 
         // log
@@ -230,15 +211,12 @@ public:
         }
 
         _chartCond.clearSeries();
-        _chartCond.addSeries(ks, sd, ContourCanvas::methodColor(opt::Method::SteepestDescent),
+        _chartCond.addSeries(ks, sd, methodColor(opt::Method::SteepestDescent),
                              opt::toString(opt::Method::SteepestDescent));
-        _chartCond.addSeries(ks, nw, ContourCanvas::methodColor(opt::Method::Newton),
+        _chartCond.addSeries(ks, nw, methodColor(opt::Method::Newton),
                              opt::toString(opt::Method::Newton));
-        _chartCond.addSeries(ks, bf, ContourCanvas::methodColor(opt::Method::BFGS),
+        _chartCond.addSeries(ks, bf, methodColor(opt::Method::BFGS),
                              opt::toString(opt::Method::BFGS));
-
-        if (_controls.animate())
-            _chartCond.beginReveal();
 
         td::String line;
         line.format("--- kappa study (%s): kappa = 1 .. 1e4, eps = 1e-6\n",

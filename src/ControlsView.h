@@ -18,7 +18,6 @@
 #include <gui/ComboBox.h>
 #include <gui/LineEdit.h>
 #include <gui/NumericEdit.h>
-#include <gui/CheckBox.h>
 #include <gui/Button.h>
 #include <gui/TextEdit.h>
 #include <gui/GridLayout.h>
@@ -53,7 +52,6 @@ private:
     gui::NumericEdit _neMaxIter;
     gui::Label _lblEps;
     gui::LineEdit _leEps;
-    gui::CheckBox _chbAnimate;
     gui::Button _btnRun;
     gui::Button _btnStudy;
     gui::Button _btnReset;
@@ -72,12 +70,11 @@ public:
     , _lblMaxIter(tr("lblMaxIter"))
     , _neMaxIter(td::int4, gui::LineEdit::Messages::DoNotSend, false)
     , _lblEps(tr("lblEps"))
-    , _chbAnimate(tr("chbAnimate"))
     , _btnRun(tr("btnRun"))
     , _btnStudy(tr("btnStudy"))
     , _btnReset(tr("btnReset"))
     , _log(gui::TextEdit::HorizontalScroll::Yes, gui::TextEdit::Events::DoNotSend, true)
-    , _gl(12, 2)
+    , _gl(11, 2)
     {
         for (const auto& fn : suite)
             _cmbFunction.addItem(fn->name());
@@ -95,7 +92,6 @@ public:
 
         _neMaxIter.setValue(td::Variant((td::INT4)500));
         _leEps.setText("1e-6");
-        _chbAnimate.setChecked(true);
 
         gui::GridComposer gc(_gl);
         gc.appendRow(_lblFunction) << _cmbFunction;
@@ -105,7 +101,6 @@ public:
         gc.appendRow(_lblX0y)      << _neX0y;
         gc.appendRow(_lblMaxIter)  << _neMaxIter;
         gc.appendRow(_lblEps)      << _leEps;
-        gc.appendRow(_chbAnimate, 0);
         gc.appendRow(_btnRun, 0);
         gc.appendRow(_btnStudy, 0);
         gc.appendRow(_btnReset, 0);
@@ -162,11 +157,6 @@ public:
         return (int)v;
     }
 
-    bool animate() const
-    {
-        return _chbAnimate.isChecked();
-    }
-
     double eps() const
     {
         const td::String s = _leEps.getText();
@@ -177,10 +167,5 @@ public:
     void appendLog(const td::String& line)
     {
         _log.appendString(line);
-    }
-
-    void clearLog()
-    {
-        _log.setText("");
     }
 };

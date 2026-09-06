@@ -1,5 +1,14 @@
 <?xml version='1.0'?>
-<DevRes version="2024.07.16" regionals="Common/Regionals">
+<DevRes version="2024.07.16"
+        regionals="Common/Regionals"
+        displayName="OptimCompare"
+        maintainer="F. Piralic"
+        email="fpiralic1@etf.unsa.ba"
+        homePage="https://github.com/farahpiralic/OptimCompare"
+        majorVersion="1"
+        minorVersion="0"
+        versionDate="2026-09-05"
+        comment="Comparison of steepest descent, Newton and BFGS optimization methods">
 	<Langs>
 		<Lang id="EN" name="English"/>
 		<Lang id="BA" name="Bosanski"/>
