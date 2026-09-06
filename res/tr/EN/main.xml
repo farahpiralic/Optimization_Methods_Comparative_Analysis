@@ -1,0 +1,55 @@
+<?xml version='1.0'?>
+<DevRes>
+    <Translations>
+        <Res id="appTitle" tr="OptimCompare - First- vs Second-Order Methods (F. Piralić, 20106)"/>
+        <Res id="App" tr="App"/>
+        <Res id="menuRun" tr="Run"/>
+        <Res id="menuHelp" tr="Help"/>
+
+        <Res id="settings" tr="Settings"/>
+        <Res id="settingsTT" tr="Application settings"/>
+        <Res id="run" tr="Run"/>
+        <Res id="runTT" tr="Run the selected method(s) from x0"/>
+        <Res id="runStudy" tr="Kappa study"/>
+        <Res id="resetView" tr="Reset"/>
+        <Res id="about" tr="About"/>
+        <Res id="aboutTitle" tr="About OptimCompare"/>
+        <Res id="aboutText" tr="Comparative analysis of first- and second-order unconstrained optimization methods: steepest descent, Newton and BFGS, each with exact line search and Armijo backtracking, on strongly convex, ill-conditioned and non-convex benchmark functions. Project #16, F. Piralić (index 20106)."/>
+
+        <Res id="lblFunction" tr="Function:"/>
+        <Res id="lblMethod" tr="Method:"/>
+        <Res id="lblStrategy" tr="Step-size strategy:"/>
+        <Res id="lblX0x" tr="x0 (x):"/>
+        <Res id="lblX0y" tr="x0 (y):"/>
+        <Res id="lblMaxIter" tr="Max iterations:"/>
+        <Res id="lblEps" tr="Tolerance (eps):"/>
+        <Res id="btnRun" tr="Run"/>
+        <Res id="btnStudy" tr="Run kappa study"/>
+        <Res id="btnReset" tr="Reset"/>
+
+        <Res id="methodSD" tr="Steepest descent"/>
+        <Res id="methodNewton" tr="Newton"/>
+        <Res id="methodBFGS" tr="BFGS"/>
+        <Res id="methodAll" tr="All three (compare)"/>
+        <Res id="stratExact" tr="Exact line search"/>
+        <Res id="stratArmijo" tr="Armijo backtracking"/>
+
+        <Res id="convTitle" tr="Convergence: ||grad f|| (log y)"/>
+        <Res id="axIter" tr="iteration"/>
+        <Res id="axGNorm" tr="||grad f||"/>
+        <Res id="condTitle" tr="Iterations vs condition number kappa"/>
+        <Res id="axKappa" tr="kappa"/>
+        <Res id="axIters" tr="iterations"/>
+        <Res id="chbAnimate" tr="Animate steps"/>
+        <Res id="chartNoData" tr="no data yet - press Run"/>
+
+        <Res id="dlgSettings" tr="Settings"/>
+        <Res id="lblLang" tr="Current language:"/>
+        <Res id="lblLang2" tr="New language:"/>
+        <Res id="chbTBIcsAndLbls" tr="Show toolbar labels"/>
+        <Res id="RestartRequired" tr="Restart required"/>
+        <Res id="RestartRequiredInfo" tr="The language change takes effect after a restart. Restart now?"/>
+        <Res id="Restart" tr="Restart"/>
+        <Res id="DoNoRestart" tr="Later"/>
+    </Translations>
+</DevRes>

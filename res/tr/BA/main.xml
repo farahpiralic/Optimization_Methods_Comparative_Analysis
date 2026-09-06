@@ -1,0 +1,55 @@
+<?xml version='1.0'?>
+<DevRes>
+    <Translations>
+        <Res id="appTitle" tr="OptimCompare - Poređenje metoda prvog i drugog reda (F. Piralić, 20106)"/>
+        <Res id="App" tr="App"/>
+        <Res id="menuRun" tr="Pokretanje"/>
+        <Res id="menuHelp" tr="Pomoć"/>
+
+        <Res id="settings" tr="Postavke"/>
+        <Res id="settingsTT" tr="Postavke aplikacije"/>
+        <Res id="run" tr="Pokreni"/>
+        <Res id="runTT" tr="Pokreni odabranu metodu(e) iz x0"/>
+        <Res id="runStudy" tr="Studija uslovljenosti"/>
+        <Res id="resetView" tr="Resetuj"/>
+        <Res id="about" tr="O aplikaciji"/>
+        <Res id="aboutTitle" tr="O aplikaciji OptimCompare"/>
+        <Res id="aboutText" tr="Uporedna analiza metoda prvog i drugog reda za neograničenu optimizaciju: najbrži pad, Newtonova metoda i BFGS, svaka sa egzaktnom linijskom pretragom i Armijo backtracking strategijom, na jako konveksnim, loše uslovljenim i nekonveksnim test funkcijama. Projekat #16, F. Piralić (indeks 20106)."/>
+
+        <Res id="lblFunction" tr="Funkcija:"/>
+        <Res id="lblMethod" tr="Metoda:"/>
+        <Res id="lblStrategy" tr="Strategija koraka:"/>
+        <Res id="lblX0x" tr="x0 (x):"/>
+        <Res id="lblX0y" tr="x0 (y):"/>
+        <Res id="lblMaxIter" tr="Maks. iteracija:"/>
+        <Res id="lblEps" tr="Tolerancija (eps):"/>
+        <Res id="btnRun" tr="Pokreni"/>
+        <Res id="btnStudy" tr="Studija uslovljenosti"/>
+        <Res id="btnReset" tr="Resetuj"/>
+
+        <Res id="methodSD" tr="Najbrži pad"/>
+        <Res id="methodNewton" tr="Newtonova metoda"/>
+        <Res id="methodBFGS" tr="BFGS"/>
+        <Res id="methodAll" tr="Sve tri (poređenje)"/>
+        <Res id="stratExact" tr="Egzaktna linijska pretraga"/>
+        <Res id="stratArmijo" tr="Armijo backtracking"/>
+
+        <Res id="convTitle" tr="Konvergencija ||grad f|| (log y)"/>
+        <Res id="axIter" tr="iteracija"/>
+        <Res id="axGNorm" tr="||grad f||"/>
+        <Res id="condTitle" tr="Iteracije u zavisnosti od broja uslovljenosti kappa"/>
+        <Res id="axKappa" tr="kappa"/>
+        <Res id="axIters" tr="iteracije"/>
+        <Res id="chbAnimate" tr="Animiraj korake"/>
+        <Res id="chartNoData" tr="još nema podataka - pritisnite Pokreni"/>
+
+        <Res id="dlgSettings" tr="Postavke"/>
+        <Res id="lblLang" tr="Trenutni jezik:"/>
+        <Res id="lblLang2" tr="Novi jezik:"/>
+        <Res id="chbTBIcsAndLbls" tr="Prikaži natpise na alatnoj traci"/>
+        <Res id="RestartRequired" tr="Potreban restart"/>
+        <Res id="RestartRequiredInfo" tr="Promjena jezika se primjenjuje nakon restarta. Restartovati sada?"/>
+        <Res id="Restart" tr="Restart"/>
+        <Res id="DoNoRestart" tr="Kasnije"/>
+    </Translations>
+</DevRes>
