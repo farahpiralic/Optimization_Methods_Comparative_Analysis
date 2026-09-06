@@ -83,52 +83,39 @@ jobs:
         run: |
           $ErrorActionPreference = "Continue"
 
-          # The collector demands files at EXACTLY this folder:
           $want = "$env:USERPROFILE\natID.SDK\bin\GTK\release\bin"
           Write-Host "collector expects GTK dlls in: $want"
-          Write-Host ("that folder exists: {0}" -f (Test-Path $want))
-          if (Test-Path $want) {
-            $direct = Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue
-            Write-Host ("  dlls directly in that folder: {0}" -f $direct.Count)
-          }
 
-          # Where do the GTK dlls ACTUALLY live? (search the whole SDK)
-          $all = Get-ChildItem "$env:USERPROFILE\natID.SDK" -Recurse -Filter *.dll -ErrorAction SilentlyContinue
-          Write-Host ("total dlls anywhere under SDK: {0}" -f $all.Count)
-
-          $adw = $all | Where-Object { $_.Name -like 'adwaita*' } | Select-Object -First 5
-          Write-Host "=== real location(s) of adwaita*.dll ==="
-          foreach ($f in $adw) { Write-Host ("  {0}" -f $f.FullName) }
-
-          # locate the folder that actually holds the GTK runtime (the one with the most dlls)
-          $srcDir = $all | Group-Object DirectoryName | Sort-Object Count -Descending | Select-Object -First 1
-          if ($srcDir) {
-            Write-Host ("richest dll folder ({0} dlls): {1}" -f $srcDir.Count, $srcDir.Name)
-          }
-
-          # If the expected folder is missing or nearly empty, mirror the real GTK dlls into it.
-          $needCopy = $false
-          if (-not (Test-Path $want)) { $needCopy = $true }
-          else {
-            $cnt = (Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue).Count
-            if ($cnt -lt 10) { $needCopy = $true }
-          }
-
-          if ($needCopy -and $srcDir -and $srcDir.Name -ne $want) {
-            New-Item -ItemType Directory -Force -Path $want | Out-Null
-            Write-Host "copying GTK dlls into the expected folder..."
-            Get-ChildItem $srcDir.Name -Filter *.dll | ForEach-Object {
-              Copy-Item $_.FullName -Destination $want -Force
+          # Gather EVERY dll that lives anywhere under the GTK tree (all subfolders).
+          $gtkRoot = "$env:USERPROFILE\natID.SDK\bin\GTK"
+          $srcRoots = @($gtkRoot, "$env:USERPROFILE\natID.SDK\bin")
+          $all = @()
+          foreach ($r in $srcRoots) {
+            if (Test-Path $r) {
+              $all += Get-ChildItem $r -Recurse -Filter *.dll -ErrorAction SilentlyContinue
             }
-            $now = (Get-ChildItem $want -Filter *.dll).Count
-            Write-Host ("expected folder now has {0} dlls" -f $now)
-          } else {
-            Write-Host "no copy needed (expected folder already populated, or same folder)"
           }
+          # de-duplicate by file NAME (first occurrence wins), skip anything already in $want
+          $seen = @{}; $src = @()
+          foreach ($f in $all) {
+            if ($f.DirectoryName -ieq $want) { continue }
+            if (-not $seen.ContainsKey($f.Name.ToLower())) { $seen[$f.Name.ToLower()] = $true; $src += $f }
+          }
+          Write-Host ("distinct GTK dll files discovered (outside target): {0}" -f $src.Count)
 
-          # final check on the exact file the collector named
-          $target = Join-Path $want "adwaita-1-0.dll"
-          Write-Host ("adwaita-1-0.dll present at expected path: {0}" -f (Test-Path $target))
+          New-Item -ItemType Directory -Force -Path $want | Out-Null
+          $copied = 0
+          foreach ($f in $src) {
+            Copy-Item $f.FullName -Destination (Join-Path $want $f.Name) -Force -ErrorAction SilentlyContinue
+            if ($?) { $copied++ }
+          }
+          $now = (Get-ChildItem $want -Filter *.dll -ErrorAction SilentlyContinue).Count
+          Write-Host ("copied {0} dlls; expected folder now holds {1} dlls total" -f $copied, $now)
+
+          # sanity: report the two that bit us
+          foreach ($name in @("adwaita-1-0.dll","ffi-7.dll")) {
+            Write-Host ("  {0}: {1}" -f $name, (Test-Path (Join-Path $want $name)))
+          }
 
       - name: Collect installer
         shell: pwsh
